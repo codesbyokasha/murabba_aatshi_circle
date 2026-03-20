@@ -29,7 +29,6 @@
             gap: 10px;
             z-index: 10;
             box-sizing: border-box;
-            flex-wrap: wrap; /* Allows buttons tbbbbo wrap on very small screens */
         }
 
         .controls input {
@@ -54,12 +53,8 @@
             touch-action: manipulation; 
         }
 
-        .controls button.secondary {
-            background-color: #28a745; /* Green for the font button */
-            box-shadow: 0 2px 4px rgba(40,167,69,0.4);
-        }
-
         .controls button:active {
+            background-color: #0056b3;
             transform: scale(0.98);
         }
 
@@ -86,7 +81,6 @@
     <div class="controls">
         <input type="number" id="userInput" value="34" min="34" placeholder="Enter number">
         <button onclick="calculateAndDraw()">Generate</button>
-        <button class="secondary" id="fontButton" onclick="loadCustomFont()">Load Nastaleeq Font</button>
     </div>
 
     <div class="canvas-container">
@@ -104,9 +98,6 @@
         const r_outer = 450;
         const text_radius_mid = r_inner + (r_middle - r_inner) / 2;
         const text_radius_out = r_middle + (r_outer - r_middle) / 2;
-
-        // Global variable to track the active font family
-        let currentFontFamily = '"Arial Black", Impact, sans-serif';
 
         const boxMappings = [
             { ring: 'out', angle: 105 }, 
@@ -126,32 +117,6 @@
             { ring: 'out', angle: 255 }, 
             { ring: 'out', angle: 345 }  
         ];
-
-        // Function to load the custom font from the repository
-        async function loadCustomFont() {
-            const fontButton = document.getElementById('fontButton');
-            fontButton.innerText = "Loading...";
-            fontButton.disabled = true;
-
-            try {
-                // IMPORTANT: Ensure your file has a .ttf or .otf extension in your GitHub repo!
-                const customFont = new FontFace('QalamTaj', 'url(fonts/qalam_taj_nastaleeq.ttf)');
-                await customFont.load();
-                document.fonts.add(customFont);
-                
-                // Update global font and redraw
-                currentFontFamily = 'QalamTaj';
-                calculateAndDraw();
-                
-                fontButton.innerText = "Nastaleeq Loaded!";
-                fontButton.style.backgroundColor = "#6c757d"; // Gray out on success
-            } catch (error) {
-                console.error("Error loading font:", error);
-                alert("Failed to load font. Please ensure the file exists in 'fonts/' and has a .ttf or .otf extension.");
-                fontButton.innerText = "Load Nastaleeq Font";
-                fontButton.disabled = false;
-            }
-        }
 
         function drawShapeBase() {
             ctx.lineWidth = 10;
@@ -187,33 +152,11 @@
             }
         }
 
-        function drawNumber(text, angleDegrees, radius) {
-            let fontSize = 65; // Starting max font size
-            
-            // Set initial font to measure text width
-            ctx.font = `900 ${fontSize}px ${currentFontFamily}`;
+        function drawNumber(text, angleDegrees, radius, fontSize) {
+            ctx.font = `900 ${fontSize}px "Arial Black", Impact, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = '#000000'; 
-            
-            // DYNAMIC FONT SIZING LOGIC:
-            // Calculate max safe width based on the radius.
-            // Each box is an arc of 30 degrees (Math.PI / 6).
-            // We use 75% of the arc length as a safe boundary to keep text from touching walls.
-            let maxSafeWidth = radius * (Math.PI / 6) * 0.75;
-            let currentTextWidth = ctx.measureText(text).width;
-
-            // If text is too wide, scale the font size down proportionally
-            if (currentTextWidth > maxSafeWidth) {
-                let scaleRatio = maxSafeWidth / currentTextWidth;
-                fontSize = Math.floor(fontSize * scaleRatio);
-                
-                // Enforce a minimum readable font size
-                fontSize = Math.max(fontSize, 16); 
-                
-                // Re-apply the newly calculated smaller font size
-                ctx.font = `900 ${fontSize}px ${currentFontFamily}`;
-            }
             
             let angleRad = angleDegrees * Math.PI / 180;
             let x = cx + radius * Math.cos(angleRad);
@@ -246,21 +189,45 @@
 
             drawShapeBase();
 
+            // Step 1: Collect all numbers and their target radius first
+            let numbersToDraw = [];
             for (let i = 0; i < boxMappings.length; i++) {
                 let box = boxMappings[i];
                 let radius = (box.ring === 'mid') ? text_radius_mid : text_radius_out;
-                
                 let valueToPrint = startingNumber + i;
 
-                if (remainder === 1 && i >= 12) {
-                    valueToPrint += 1;
-                } else if (remainder === 2 && i >= 8) {
-                    valueToPrint += 1;
-                } else if (remainder === 3 && i >= 4) {
-                    valueToPrint += 1;
-                }
+                if (remainder === 1 && i >= 12) valueToPrint += 1;
+                else if (remainder === 2 && i >= 8) valueToPrint += 1;
+                else if (remainder === 3 && i >= 4) valueToPrint += 1;
                 
-                drawNumber(valueToPrint.toString(), box.angle, radius);
+                numbersToDraw.push({ text: valueToPrint.toString(), angle: box.angle, radius: radius });
+            }
+
+            // Step 2: "Pre-flight check" to find the universally safe font size
+            let globalFontSize = 65; // Starting max size
+            ctx.font = `900 65px "Arial Black", Impact, sans-serif`; // Set context to measure
+            
+            for (let item of numbersToDraw) {
+                let maxSafeWidth = item.radius * (Math.PI / 6) * 0.75;
+                let currentTextWidth = ctx.measureText(item.text).width;
+
+                if (currentTextWidth > maxSafeWidth) {
+                    let scaleRatio = maxSafeWidth / currentTextWidth;
+                    let neededFontSize = Math.floor(65 * scaleRatio);
+                    
+                    // If this box needs a smaller font than our current global size, update the global size
+                    if (neededFontSize < globalFontSize) {
+                        globalFontSize = neededFontSize;
+                    }
+                }
+            }
+            
+            // Enforce minimum readable size
+            globalFontSize = Math.max(globalFontSize, 16); 
+
+            // Step 3: Draw all numbers using the unified global font size
+            for (let item of numbersToDraw) {
+                drawNumber(item.text, item.angle, item.radius, globalFontSize);
             }
         }
 
