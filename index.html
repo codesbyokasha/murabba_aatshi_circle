@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Interactive Number Wheel</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            overflow: hidden; 
+        }
+
+        .controls {
+            width: 100%;
+            padding: 15px 10px;
+            background: #ffffff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            z-index: 10;
+            box-sizing: border-box;
+        }
+
+        .controls input {
+            padding: 10px;
+            width: 120px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 16px; 
+        }
+
+        .controls button {
+            font-size: 16px;
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,123,255,0.4);
+            touch-action: manipulation; 
+        }
+
+        .controls button:active {
+            background-color: #0056b3;
+            transform: scale(0.98);
+        }
+
+        .canvas-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        canvas {
+            max-width: 100%; 
+            max-height: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <input type="number" id="userInput" value="71" min="34" placeholder="Enter number">
+        <button onclick="calculateAndDraw()">Generate</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="dartboardCanvas" width="1000" height="1000"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('dartboardCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const cx = 500;
+        const cy = 500;
+        const r_inner = 75;
+        const r_middle = 250;
+        const r_outer = 450;
+        const text_radius_mid = r_inner + (r_middle - r_inner) / 2;
+        const text_radius_out = r_middle + (r_outer - r_middle) / 2;
+
+        // Map of the original 1-16 positions
+        // Array index 0 is Box#1, index 1 is Box#2, etc.
+        const boxMappings = [
+            { ring: 'out', angle: 105 }, // Box 1 
+            { ring: 'out', angle: 15 },  // Box 2 
+            { ring: 'mid', angle: 315 }, // Box 3 
+            { ring: 'out', angle: 225 }, // Box 4 
+            { ring: 'out', angle: 315 }, // Box 5 
+            { ring: 'mid', angle: 225 }, // Box 6 
+            { ring: 'out', angle: 165 }, // Box 7 
+            { ring: 'out', angle: 75 },  // Box 8 
+            { ring: 'out', angle: 195 }, // Box 9 
+            { ring: 'out', angle: 285 }, // Box 10
+            { ring: 'out', angle: 45 },  // Box 11
+            { ring: 'mid', angle: 135 }, // Box 12
+            { ring: 'mid', angle: 45 },  // Box 13
+            { ring: 'out', angle: 135 }, // Box 14
+            { ring: 'out', angle: 255 }, // Box 15
+            { ring: 'out', angle: 345 }  // Box 16
+        ];
+
+        function drawShapeBase() {
+            ctx.lineWidth = 10;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#000000';
+            ctx.fillStyle = '#000000';
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r_inner, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r_middle, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r_outer, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath(); ctx.moveTo(cx + r_inner, cy); ctx.lineTo(cx + r_outer, cy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy + r_inner); ctx.lineTo(cx, cy + r_outer); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx - r_inner, cy); ctx.lineTo(cx - r_outer, cy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy - r_inner); ctx.lineTo(cx, cy - r_outer); ctx.stroke();
+
+            for (let i = 0; i < 12; i++) {
+                if (i % 3 === 0) continue; 
+                let angle = i * Math.PI / 6;
+                ctx.beginPath();
+                ctx.moveTo(cx + r_middle * Math.cos(angle), cy + r_middle * Math.sin(angle));
+                ctx.lineTo(cx + r_outer * Math.cos(angle), cy + r_outer * Math.sin(angle));
+                ctx.stroke();
+            }
+        }
+
+        function drawNumber(text, angleDegrees, radius) {
+            ctx.font = '900 65px "Arial Black", Impact, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#000000'; // Reset fill style to black for numbers
+            
+            let angleRad = angleDegrees * Math.PI / 180;
+            let x = cx + radius * Math.cos(angleRad);
+            let y = cy + radius * Math.sin(angleRad);
+            ctx.fillText(text, x, y + 4); 
+        }
+
+        function calculateAndDraw() {
+            const inputField = document.getElementById('userInput');
+            let inputValue = parseInt(inputField.value, 10);
+
+            // Clear canvas entirely before drawing
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Validation: Show error directly on the canvas
+            if (isNaN(inputValue) || inputValue < 34) {
+                ctx.fillStyle = '#d9534f'; // Red text for error
+                ctx.font = 'bold 45px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText("Invalid Input", cx, cy - 30);
+                
+                ctx.fillStyle = '#333333';
+                ctx.font = '30px Arial';
+                ctx.fillText("Number must be 34 or greater", cx, cy + 30);
+                return; // Stop execution
+            }
+
+            // Calculations
+            let baseValue = inputValue - 30;
+            let startingNumber = Math.floor(baseValue / 4);
+            let remainder = baseValue % 4;
+
+            drawShapeBase();
+
+            // Populate boxes with sequence based on remainder rules
+            for (let i = 0; i < boxMappings.length; i++) {
+                let box = boxMappings[i];
+                let radius = (box.ring === 'mid') ? text_radius_mid : text_radius_out;
+                
+                let valueToPrint = startingNumber + i;
+
+                // Apply Remainder Logic
+                // i is 0-indexed, so Box 13 is index 12, Box 9 is index 8, Box 5 is index 4
+                if (remainder === 1 && i >= 12) {
+                    valueToPrint += 1;
+                } else if (remainder === 2 && i >= 8) {
+                    valueToPrint += 1;
+                } else if (remainder === 3 && i >= 4) {
+                    valueToPrint += 1;
+                }
+                
+                drawNumber(valueToPrint.toString(), box.angle, radius);
+            }
+        }
+
+        // Run once on load
+        window.onload = calculateAndDraw;
+
+    </script>
+</body>
+</html>
