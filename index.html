@@ -29,6 +29,7 @@
             gap: 10px;
             z-index: 10;
             box-sizing: border-box;
+            flex-wrap: wrap; /* Allows buttons to wrap on very small screens */
         }
 
         .controls input {
@@ -53,8 +54,12 @@
             touch-action: manipulation; 
         }
 
+        .controls button.secondary {
+            background-color: #28a745; /* Green for the font button */
+            box-shadow: 0 2px 4px rgba(40,167,69,0.4);
+        }
+
         .controls button:active {
-            background-color: #0056b3;
             transform: scale(0.98);
         }
 
@@ -66,7 +71,7 @@
             width: 100%;
             padding: 10px;
             box-sizing: border-box;
-            min-height: 0; /* Fix applied here */
+            min-height: 0; 
         }
 
         canvas {
@@ -81,6 +86,7 @@
     <div class="controls">
         <input type="number" id="userInput" value="34" min="34" placeholder="Enter number">
         <button onclick="calculateAndDraw()">Generate</button>
+        <button class="secondary" id="fontButton" onclick="loadCustomFont()">Load Nastaleeq Font</button>
     </div>
 
     <div class="canvas-container">
@@ -99,26 +105,53 @@
         const text_radius_mid = r_inner + (r_middle - r_inner) / 2;
         const text_radius_out = r_middle + (r_outer - r_middle) / 2;
 
-        // Map of the original 1-16 positions
-        // Array index 0 is Box#1, index 1 is Box#2, etc.
+        // Global variable to track the active font family
+        let currentFontFamily = '"Arial Black", Impact, sans-serif';
+
         const boxMappings = [
-            { ring: 'out', angle: 105 }, // Box 1 
-            { ring: 'out', angle: 15 },  // Box 2 
-            { ring: 'mid', angle: 315 }, // Box 3 
-            { ring: 'out', angle: 225 }, // Box 4 
-            { ring: 'out', angle: 315 }, // Box 5 
-            { ring: 'mid', angle: 225 }, // Box 6 
-            { ring: 'out', angle: 165 }, // Box 7 
-            { ring: 'out', angle: 75 },  // Box 8 
-            { ring: 'out', angle: 195 }, // Box 9 
-            { ring: 'out', angle: 285 }, // Box 10
-            { ring: 'out', angle: 45 },  // Box 11
-            { ring: 'mid', angle: 135 }, // Box 12
-            { ring: 'mid', angle: 45 },  // Box 13
-            { ring: 'out', angle: 135 }, // Box 14
-            { ring: 'out', angle: 255 }, // Box 15
-            { ring: 'out', angle: 345 }  // Box 16
+            { ring: 'out', angle: 105 }, 
+            { ring: 'out', angle: 15 },  
+            { ring: 'mid', angle: 315 }, 
+            { ring: 'out', angle: 225 }, 
+            { ring: 'out', angle: 315 }, 
+            { ring: 'mid', angle: 225 }, 
+            { ring: 'out', angle: 165 }, 
+            { ring: 'out', angle: 75 },  
+            { ring: 'out', angle: 195 }, 
+            { ring: 'out', angle: 285 }, 
+            { ring: 'out', angle: 45 },  
+            { ring: 'mid', angle: 135 }, 
+            { ring: 'mid', angle: 45 },  
+            { ring: 'out', angle: 135 }, 
+            { ring: 'out', angle: 255 }, 
+            { ring: 'out', angle: 345 }  
         ];
+
+        // Function to load the custom font from the repository
+        async function loadCustomFont() {
+            const fontButton = document.getElementById('fontButton');
+            fontButton.innerText = "Loading...";
+            fontButton.disabled = true;
+
+            try {
+                // IMPORTANT: Ensure your file has a .ttf or .otf extension in your GitHub repo!
+                const customFont = new FontFace('QalamTaj', 'url(fonts/qalam_taj_nastaleeq.ttf)');
+                await customFont.load();
+                document.fonts.add(customFont);
+                
+                // Update global font and redraw
+                currentFontFamily = 'QalamTaj';
+                calculateAndDraw();
+                
+                fontButton.innerText = "Nastaleeq Loaded!";
+                fontButton.style.backgroundColor = "#6c757d"; // Gray out on success
+            } catch (error) {
+                console.error("Error loading font:", error);
+                alert("Failed to load font. Please ensure the file exists in 'fonts/' and has a .ttf or .otf extension.");
+                fontButton.innerText = "Load Nastaleeq Font";
+                fontButton.disabled = false;
+            }
+        }
 
         function drawShapeBase() {
             ctx.lineWidth = 10;
@@ -155,10 +188,32 @@
         }
 
         function drawNumber(text, angleDegrees, radius) {
-            ctx.font = '900 65px "Arial Black", Impact, sans-serif';
+            let fontSize = 65; // Starting max font size
+            
+            // Set initial font to measure text width
+            ctx.font = `900 ${fontSize}px ${currentFontFamily}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#000000'; // Reset fill style to black for numbers
+            ctx.fillStyle = '#000000'; 
+            
+            // DYNAMIC FONT SIZING LOGIC:
+            // Calculate max safe width based on the radius.
+            // Each box is an arc of 30 degrees (Math.PI / 6).
+            // We use 75% of the arc length as a safe boundary to keep text from touching walls.
+            let maxSafeWidth = radius * (Math.PI / 6) * 0.75;
+            let currentTextWidth = ctx.measureText(text).width;
+
+            // If text is too wide, scale the font size down proportionally
+            if (currentTextWidth > maxSafeWidth) {
+                let scaleRatio = maxSafeWidth / currentTextWidth;
+                fontSize = Math.floor(fontSize * scaleRatio);
+                
+                // Enforce a minimum readable font size
+                fontSize = Math.max(fontSize, 16); 
+                
+                // Re-apply the newly calculated smaller font size
+                ctx.font = `900 ${fontSize}px ${currentFontFamily}`;
+            }
             
             let angleRad = angleDegrees * Math.PI / 180;
             let x = cx + radius * Math.cos(angleRad);
@@ -170,12 +225,10 @@
             const inputField = document.getElementById('userInput');
             let inputValue = parseInt(inputField.value, 10);
 
-            // Clear canvas entirely before drawing
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Validation: Show error directly on the canvas
             if (isNaN(inputValue) || inputValue < 34) {
-                ctx.fillStyle = '#d9534f'; // Red text for error
+                ctx.fillStyle = '#d9534f'; 
                 ctx.font = 'bold 45px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -184,25 +237,21 @@
                 ctx.fillStyle = '#333333';
                 ctx.font = '30px Arial';
                 ctx.fillText("Number must be 34 or greater", cx, cy + 30);
-                return; // Stop execution
+                return; 
             }
 
-            // Calculations
             let baseValue = inputValue - 30;
             let startingNumber = Math.floor(baseValue / 4);
             let remainder = baseValue % 4;
 
             drawShapeBase();
 
-            // Populate boxes with sequence based on remainder rules
             for (let i = 0; i < boxMappings.length; i++) {
                 let box = boxMappings[i];
                 let radius = (box.ring === 'mid') ? text_radius_mid : text_radius_out;
                 
                 let valueToPrint = startingNumber + i;
 
-                // Apply Remainder Logic
-                // i is 0-indexed, so Box 13 is index 12, Box 9 is index 8, Box 5 is index 4
                 if (remainder === 1 && i >= 12) {
                     valueToPrint += 1;
                 } else if (remainder === 2 && i >= 8) {
@@ -215,7 +264,6 @@
             }
         }
 
-        // Run once on load
         window.onload = calculateAndDraw;
 
     </script>
