@@ -191,13 +191,10 @@
 
             drawShapeBase();
 
-            // Step 1: Collect all numbers and metadata
             let numbersToDraw = [];
             for (let i = 0; i < boxMappings.length; i++) {
                 let box = boxMappings[i];
                 let radius = (box.ring === 'mid') ? text_radius_mid : text_radius_out;
-                
-                // The inner ring slices are 90 degrees (Math.PI/2), outer slices are 30 degrees (Math.PI/6)
                 let sliceAngleRad = (box.ring === 'mid') ? (Math.PI / 2) : (Math.PI / 6); 
                 
                 let valueToPrint = startingNumber + i;
@@ -214,16 +211,16 @@
                 });
             }
 
-            // Step 2: "Pre-flight check" with a much larger maximum bound
-            let maxInitialFontSize = 130; 
-            let globalFontSize = maxInitialFontSize;
+            // === THE PERFECT PARAMETERS ===
+            let maxInitialFontSize = 85;      // Max height so it doesn't touch top/bottom arcs
+            let safeWidthMultiplier = 0.65;   // 65% width prevents rectangular text hitting diagonal walls
+            // ===============================
             
-            // Set context explicitly to the max size so measureText acts accurately
+            let globalFontSize = maxInitialFontSize;
             ctx.font = `900 ${maxInitialFontSize}px "Arial Black", Impact, sans-serif`; 
             
             for (let item of numbersToDraw) {
-                // Determine 85% of the physical arc length width available to the text
-                let maxSafeWidth = item.radius * item.sliceAngleRad * 0.85;
+                let maxSafeWidth = item.radius * item.sliceAngleRad * safeWidthMultiplier;
                 let currentTextWidth = ctx.measureText(item.text).width;
 
                 if (currentTextWidth > maxSafeWidth) {
@@ -236,10 +233,8 @@
                 }
             }
             
-            // Enforce minimum readable size
             globalFontSize = Math.max(globalFontSize, 16); 
 
-            // Step 3: Draw all numbers 
             for (let item of numbersToDraw) {
                 drawNumber(item.text, item.angle, item.radius, globalFontSize);
             }
