@@ -79,7 +79,7 @@
 <body>
 
     <div class="controls">
-        <input type="number" id="userInput" value="34" min="34" placeholder="Enter number">
+        <input type="number" id="userInput" value="5999" min="34" placeholder="Enter number">
         <button onclick="calculateAndDraw()">Generate</button>
     </div>
 
@@ -161,7 +161,9 @@
             let angleRad = angleDegrees * Math.PI / 180;
             let x = cx + radius * Math.cos(angleRad);
             let y = cy + radius * Math.sin(angleRad);
-            ctx.fillText(text, x, y + 4); 
+            
+            // Nudge text down slightly so it visually centers better inside the arcs
+            ctx.fillText(text, x, y + (fontSize * 0.08)); 
         }
 
         function calculateAndDraw() {
@@ -189,33 +191,45 @@
 
             drawShapeBase();
 
-            // Step 1: Collect all numbers and their target radius first
+            // Step 1: Collect all numbers and metadata
             let numbersToDraw = [];
             for (let i = 0; i < boxMappings.length; i++) {
                 let box = boxMappings[i];
                 let radius = (box.ring === 'mid') ? text_radius_mid : text_radius_out;
+                
+                // The inner ring slices are 90 degrees (Math.PI/2), outer slices are 30 degrees (Math.PI/6)
+                let sliceAngleRad = (box.ring === 'mid') ? (Math.PI / 2) : (Math.PI / 6); 
+                
                 let valueToPrint = startingNumber + i;
 
                 if (remainder === 1 && i >= 12) valueToPrint += 1;
                 else if (remainder === 2 && i >= 8) valueToPrint += 1;
                 else if (remainder === 3 && i >= 4) valueToPrint += 1;
                 
-                numbersToDraw.push({ text: valueToPrint.toString(), angle: box.angle, radius: radius });
+                numbersToDraw.push({ 
+                    text: valueToPrint.toString(), 
+                    angle: box.angle, 
+                    radius: radius,
+                    sliceAngleRad: sliceAngleRad
+                });
             }
 
-            // Step 2: "Pre-flight check" to find the universally safe font size
-            let globalFontSize = 65; // Starting max size
-            ctx.font = `900 65px "Arial Black", Impact, sans-serif`; // Set context to measure
+            // Step 2: "Pre-flight check" with a much larger maximum bound
+            let maxInitialFontSize = 130; 
+            let globalFontSize = maxInitialFontSize;
+            
+            // Set context explicitly to the max size so measureText acts accurately
+            ctx.font = `900 ${maxInitialFontSize}px "Arial Black", Impact, sans-serif`; 
             
             for (let item of numbersToDraw) {
-                let maxSafeWidth = item.radius * (Math.PI / 6) * 0.75;
+                // Determine 85% of the physical arc length width available to the text
+                let maxSafeWidth = item.radius * item.sliceAngleRad * 0.85;
                 let currentTextWidth = ctx.measureText(item.text).width;
 
                 if (currentTextWidth > maxSafeWidth) {
                     let scaleRatio = maxSafeWidth / currentTextWidth;
-                    let neededFontSize = Math.floor(65 * scaleRatio);
+                    let neededFontSize = Math.floor(maxInitialFontSize * scaleRatio);
                     
-                    // If this box needs a smaller font than our current global size, update the global size
                     if (neededFontSize < globalFontSize) {
                         globalFontSize = neededFontSize;
                     }
@@ -225,7 +239,7 @@
             // Enforce minimum readable size
             globalFontSize = Math.max(globalFontSize, 16); 
 
-            // Step 3: Draw all numbers using the unified global font size
+            // Step 3: Draw all numbers 
             for (let item of numbersToDraw) {
                 drawNumber(item.text, item.angle, item.radius, globalFontSize);
             }
