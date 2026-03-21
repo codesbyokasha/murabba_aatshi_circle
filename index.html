@@ -9,13 +9,8 @@
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
             background-color: #f4f4f9;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             font-family: Arial, sans-serif;
-            overflow: hidden; 
         }
 
         .controls {
@@ -27,7 +22,9 @@
             justify-content: center;
             align-items: center;
             gap: 10px;
-            z-index: 10;
+            position: sticky; 
+            top: 0;
+            z-index: 100;
             box-sizing: border-box;
         }
 
@@ -59,20 +56,18 @@
         }
 
         .canvas-container {
-            flex-grow: 1;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             width: 100%;
-            padding: 10px;
+            padding: 20px 10px; 
             box-sizing: border-box;
-            min-height: 0; 
         }
 
         canvas {
             max-width: 100%; 
-            max-height: 100%;
-            object-fit: contain;
+            height: auto; 
+            background-color: transparent;
         }
     </style>
 </head>
@@ -84,18 +79,17 @@
     </div>
 
     <div class="canvas-container">
-        <canvas id="dartboardCanvas" width="1000" height="1000"></canvas>
+        <canvas id="dartboardCanvas" width="1000" height="2100"></canvas>
     </div>
 
     <script>
         const canvas = document.getElementById('dartboardCanvas');
         const ctx = canvas.getContext('2d');
 
-        const cx = 500;
-        const cy = 500;
-        const r_inner = 75;
-        const r_middle = 250;
-        const r_outer = 450;
+        const r_inner = 70;  
+        const r_middle = 240; 
+        const r_outer = 430; 
+        
         const text_radius_mid = r_inner + (r_middle - r_inner) / 2;
         const text_radius_out = r_middle + (r_outer - r_middle) / 2;
 
@@ -118,7 +112,7 @@
             { ring: 'out', angle: 345 }  
         ];
 
-        function drawShapeBase() {
+        function drawShapeBase(cx, cy) {
             ctx.lineWidth = 10;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
@@ -152,7 +146,7 @@
             }
         }
 
-        function drawNumber(text, angleDegrees, radius, fontSize) {
+        function drawNumber(text, angleDegrees, radius, fontSize, cx, cy) {
             ctx.font = `900 ${fontSize}px "Arial Black", Impact, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -162,34 +156,21 @@
             let x = cx + radius * Math.cos(angleRad);
             let y = cy + radius * Math.sin(angleRad);
             
-            // Nudge text down slightly so it visually centers better inside the arcs
             ctx.fillText(text, x, y + (fontSize * 0.08)); 
         }
 
-        function calculateAndDraw() {
-            const inputField = document.getElementById('userInput');
-            let inputValue = parseInt(inputField.value, 10);
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            if (isNaN(inputValue) || inputValue < 34) {
-                ctx.fillStyle = '#d9534f'; 
-                ctx.font = 'bold 45px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText("Invalid Input", cx, cy - 30);
-                
-                ctx.fillStyle = '#333333';
-                ctx.font = '30px Arial';
-                ctx.fillText("Number must be 34 or greater", cx, cy + 30);
-                return; 
-            }
-
+        function drawCompleteCircle(inputValue, titleText, cx, cy) {
             let baseValue = inputValue - 30;
             let startingNumber = Math.floor(baseValue / 4);
             let remainder = baseValue % 4;
 
-            drawShapeBase();
+            drawShapeBase(cx, cy);
+
+            ctx.font = 'bold 75px "Times New Roman", Times, serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillStyle = '#000000';
+            ctx.fillText(titleText, cx, cy - r_outer - 15); 
 
             let numbersToDraw = [];
             for (let i = 0; i < boxMappings.length; i++) {
@@ -211,10 +192,8 @@
                 });
             }
 
-            // === THE PERFECT PARAMETERS ===
-            let maxInitialFontSize = 85;      // Max height so it doesn't touch top/bottom arcs
-            let safeWidthMultiplier = 0.65;   // 65% width prevents rectangular text hitting diagonal walls
-            // ===============================
+            let maxInitialFontSize = 85;     
+            let safeWidthMultiplier = 0.65;   
             
             let globalFontSize = maxInitialFontSize;
             ctx.font = `900 ${maxInitialFontSize}px "Arial Black", Impact, sans-serif`; 
@@ -236,8 +215,36 @@
             globalFontSize = Math.max(globalFontSize, 16); 
 
             for (let item of numbersToDraw) {
-                drawNumber(item.text, item.angle, item.radius, globalFontSize);
+                drawNumber(item.text, item.angle, item.radius, globalFontSize, cx, cy);
             }
+        }
+
+        function calculateAndDraw() {
+            const inputField = document.getElementById('userInput');
+            let inputValue = parseInt(inputField.value, 10);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (isNaN(inputValue) || inputValue < 34) {
+                ctx.fillStyle = '#d9534f'; 
+                ctx.font = 'bold 45px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText("Invalid Input", 500, 200);
+                
+                ctx.fillStyle = '#333333';
+                ctx.font = '30px Arial';
+                ctx.fillText("Number must be 34 or greater", 500, 260);
+                return; 
+            }
+
+            // --- DRAW THE TOP DYNAMIC CIRCLE ---
+            // Center Y is 550
+            drawCompleteCircle(inputValue, "Naqsh", 500, 550);
+
+            // --- DRAW THE BOTTOM CONSTANT CIRCLE ---
+            // Center Y pushed down to 1580 to create a comfortable gap
+            drawCompleteCircle(34, "Chaal", 500, 1580);
         }
 
         window.onload = calculateAndDraw;
